@@ -25,3 +25,5 @@ async function bootstrap() {
 }
 
 void bootstrap();
+
+//NOTE: TEST
