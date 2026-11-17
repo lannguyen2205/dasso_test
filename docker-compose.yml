@@ -30,22 +30,36 @@ services:
       - "4000:4000"
     restart: unless-stopped
 
-  web:
+  # Two Next.js apps for testing Keycloak SSO: App A :3001, App B :3002 (see README.md)
+  web-a:
     build:
-      context: ./web
-      dockerfile_inline: |
+      context: ./web-a
+      dockerfile_inline: &web_dockerfile |
         FROM node:20-alpine
         WORKDIR /app
         COPY package*.json ./
         RUN npm install
         COPY . .
-        EXPOSE 3000
         CMD ["npm", "run", "dev"]
-    container_name: dasso-web
+    container_name: dasso-web-a
     ports:
-      - "3000:3000"
+      - "3001:3001"
     environment:
       NEXT_PUBLIC_KEYCLOAK_URL: http://localhost:8080
+      NEXT_PUBLIC_KEYCLOAK_REALM: dasso
+      NEXT_PUBLIC_SERVER_URL: http://localhost:4000
+    restart: unless-stopped
+
+  web-b:
+    build:
+      context: ./web-b
+      dockerfile_inline: *web_dockerfile
+    container_name: dasso-web-b
+    ports:
+      - "3002:3002"
+    environment:
+      NEXT_PUBLIC_KEYCLOAK_URL: http://localhost:8080
+      NEXT_PUBLIC_KEYCLOAK_REALM: dasso
       NEXT_PUBLIC_SERVER_URL: http://localhost:4000
     restart: unless-stopped
 
