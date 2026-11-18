@@ -17,6 +17,7 @@ export function getKeycloak(): Promise<KeycloakSession> {
       // (e.g. you logged in on the other app) without showing the login page.
       onLoad: "check-sso",
       silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
+      silentCheckSsoFallback: false,
       pkceMethod: "S256",
       // The session iframe needs third-party cookies; not needed for this test.
       checkLoginIframe: false,
