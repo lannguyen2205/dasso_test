@@ -69,6 +69,12 @@ jobs:
           # Vercel project per app; override with repo variables VERCEL_PROJECT_WEB_A / VERCEL_PROJECT_WEB_B
           VERCEL_PROJECT: ${{ matrix.app == 'web-a' && (vars.VERCEL_PROJECT_WEB_A || 'dasso-test') || (vars.VERCEL_PROJECT_WEB_B || 'dasso-test-b') }}
         run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "Notice: VERCEL_TOKEN secret is not configured in GitHub Secrets."
+            echo "If Vercel is connected directly to this GitHub repository on branch deploy,"
+            echo "Vercel Git Integration handles automatic deployments without requiring GitHub Actions."
+            exit 0
+          fi
           npm install --global vercel@latest
           # Link and deploy from repository root; each Vercel project's Root Directory
           # setting (web-a / web-b) selects which app gets built.

@@ -1,4 +1,4 @@
-name: Deploy Server to Railway
+name: Deploy Servers to Railway
 
 on:
   push:
@@ -6,30 +6,83 @@ on:
       - deploy
     paths:
       - 'server/**'
+      - 'server-a/**'
+      - 'server-b/**'
       - '.github/workflows/deploy-server.yml'
   workflow_dispatch:
 
 jobs:
-  deploy-server:
-    name: Deploy NestJS Backend to Railway
+  detect-changes:
+    name: Detect changed server services
     runs-on: ubuntu-latest
+    outputs:
+      servers: ${{ steps.detect.outputs.servers }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Pick servers to deploy
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: |
+          ALL='["server","server-a","server-b"]'
+          # Manual run or first push of branch (no previous commit) -> deploy all servers
+          if [ "$EVENT_NAME" != "push" ] || ! git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+            echo "servers=$ALL" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          CHANGED=$(git diff --name-only "$BEFORE_SHA" "$AFTER_SHA")
+          # Workflow file itself changed -> deploy all servers
+          if echo "$CHANGED" | grep -qx '.github/workflows/deploy-server.yml'; then
+            echo "servers=$ALL" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          SERVERS=$(echo "$CHANGED" | grep -oE '^server(-[ab])?/' | tr -d '/' | sort -u | jq -R . | jq -sc .)
+          echo "Changed servers: $SERVERS"
+          echo "servers=$SERVERS" >> "$GITHUB_OUTPUT"
+
+  deploy-server:
+    name: Deploy ${{ matrix.server }} to Railway
+    needs: detect-changes
+    if: needs.detect-changes.outputs.servers != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        server: ${{ fromJSON(needs.detect-changes.outputs.servers) }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Deploy Server Service
-        run: |
-          if [ -n "${{ secrets.RAILWAY_TOKEN }}" ]; then
-            echo "Deploying via Railway CLI..."
-            npm install -g @railway/cli
-            cd server
-            railway up --service ${{ secrets.RAILWAY_SERVER_SERVICE_NAME || 'server' }} --detach
-          elif [ -n "${{ secrets.RAILWAY_SERVER_DEPLOY_HOOK }}" ]; then
-            echo "Deploying via Railway Webhook Trigger..."
-            curl -X POST "${{ secrets.RAILWAY_SERVER_DEPLOY_HOOK }}"
-          else
-            echo "Notice: Neither RAILWAY_TOKEN nor RAILWAY_SERVER_DEPLOY_HOOK configured. Railway Git Auto-Deploy handles deployment automatically."
-          fi
+      - name: Deploy Service to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          SERVER_NAME: ${{ matrix.server }}
+        run: |
+          if [ "$SERVER_NAME" = "server-a" ]; then
+            SERVICE_NAME="${{ secrets.RAILWAY_SERVER_A_SERVICE_NAME || vars.RAILWAY_SERVER_A_SERVICE_NAME || 'server-a' }}"
+            DEPLOY_HOOK="${{ secrets.RAILWAY_SERVER_A_DEPLOY_HOOK }}"
+          elif [ "$SERVER_NAME" = "server-b" ]; then
+            SERVICE_NAME="${{ secrets.RAILWAY_SERVER_B_SERVICE_NAME || vars.RAILWAY_SERVER_B_SERVICE_NAME || 'server-b' }}"
+            DEPLOY_HOOK="${{ secrets.RAILWAY_SERVER_B_DEPLOY_HOOK }}"
+          else
+            SERVICE_NAME="${{ secrets.RAILWAY_SERVER_SERVICE_NAME || vars.RAILWAY_SERVER_SERVICE_NAME || 'server' }}"
+            DEPLOY_HOOK="${{ secrets.RAILWAY_SERVER_DEPLOY_HOOK }}"
+          fi
 
+          if [ -n "$RAILWAY_TOKEN" ]; then
+            echo "Deploying $SERVER_NAME (service: $SERVICE_NAME) via Railway CLI..."
+            npm install -g @railway/cli
+            cd "$SERVER_NAME"
+            railway up --service "$SERVICE_NAME" --detach
+          elif [ -n "$DEPLOY_HOOK" ]; then
+            echo "Deploying $SERVER_NAME via Railway Webhook Trigger..."
+            curl -X POST "$DEPLOY_HOOK"
+          else
+            echo "Notice: Neither RAILWAY_TOKEN nor deploy hook configured for $SERVER_NAME. Railway Git Auto-Deploy handles deployment automatically if connected via dashboard."
+          fi

@@ -9,9 +9,11 @@ Tài liệu hướng dẫn thiết lập và triển khai tự động độc l�
 | Dịch vụ | Công nghệ | Nơi triển khai | Nhiệm vụ |
 | :--- | :--- | :--- | :--- |
 | **`keycloak/`** | Keycloak 26 Container (Docker) | **Railway** | Quản lý định danh SSO, kết nối Supabase PostgreSQL (Session Pooler port 5432). |
-| **`server/`** | NestJS Backend Gateway | **Railway** | Bảo vệ Admin API, bọc dữ liệu chuẩn (`TransformInterceptor`, `AllExceptionsFilter`, `ResponseCodes`). |
-| **`web-a/`** | Next.js App Router (Tailwind) — port 3001 | **Vercel** (`dasso-test`) | App A: trang login + nút đăng nhập Keycloak (client `app-a`) để test SSO. |
-| **`web-b/`** | Next.js App Router (Tailwind) — port 3002 | **Vercel** (`dasso-test-b`) | App B: giống App A, dùng client `app-b`. |
+| **`server/`** | NestJS Backend Gateway (port 4000) | **Railway** | Bảo vệ Admin API, bọc dữ liệu chuẩn (`TransformInterceptor`, `AllExceptionsFilter`, `ResponseCodes`). |
+| **`server-a/`** | NestJS Backend App A (port 4001) | **Railway** | Authentication API độc lập (Email OTP, Supabase schema `server_a`, JWT). |
+| **`server-b/`** | NestJS Backend App B (port 4002) | **Railway** | Authentication API độc lập (Email OTP, Supabase schema `server_b`, JWT). |
+| **`web-a/`** | Next.js App Router (Tailwind) — port 3001 | **Vercel** (`dasso-test`) | App A: giao diện đăng nhập kép (Server Email OTP + Keycloak SSO client `app-a`). |
+| **`web-b/`** | Next.js App Router (Tailwind) — port 3002 | **Vercel** (`dasso-test-b`) | App B: giao diện đăng nhập kép (Server Email OTP + Keycloak SSO client `app-b`). |
 
 ---
 
@@ -49,20 +51,49 @@ Tài liệu hướng dẫn thiết lập và triển khai tự động độc l�
 
 ---
 
-### BƯỚC 3: Triển khai `Server` (NestJS) trên Railway
-1. Tại cùng Project Railway đó, bấm **New** $\rightarrow$ **GitHub Repo** $\rightarrow$ Chọn tiếp repo **`dasso_test`**.
-2. Đổi tên service thành **`DaSSO-Server`**.
-3. Cấu hình service:
-   * **Settings** $\rightarrow$ mục **Branch**: Chọn nhánh **`deploy`**.
-   * **Settings** $\rightarrow$ mục **Build**:
-     * **Root Directory**: Nhập **`/server`**
-   * **Variables** $\rightarrow$ Bấm **Raw Editor** $\rightarrow$ Dán các biến:
-     ```env
-     PORT=4000
-     KEYCLOAK_URL=https://<domain_keycloak_o_buoc_2>
-     ```
-   * **Settings** $\rightarrow$ mục **Networking**: Bấm **Generate Domain** $\rightarrow$ Chọn Port **`4000`**.
-   * 👉 Copy lại Domain Server vừa sinh ra (ví dụ: `https://dasso-server-production.up.railway.app`).
+### BƯỚC 3: Triển khai Backend Services (NestJS) trên Railway
+
+Tạo các service tương ứng trên Railway (bấm **New** $\rightarrow$ **GitHub Repo** $\rightarrow$ chọn repo **`dasso_test`**):
+
+#### 1. Backend Gateway `server/` (Service: `DaSSO-Server`)
+* **Branch**: `deploy`
+* **Root Directory**: `/server`
+* **Variables**:
+  ```env
+  PORT=4000
+  KEYCLOAK_URL=https://<domain_keycloak_o_buoc_2>
+  ```
+* **Networking**: Port `4000` $\rightarrow$ Generate Domain (ví dụ: `https://dasso-server-production.up.railway.app`).
+
+#### 2. Backend App A `server-a/` (Service: `DaSSO-Server-A`)
+* **Branch**: `deploy`
+* **Root Directory**: `/server-a`
+* **Variables**:
+  ```env
+  PORT=4001
+  SUPABASE_DATABASE_URL=postgresql://postgres.<REF>:<PASS>@<HOST>:5432/postgres
+  DB_SCHEMA=server_a
+  JWT_SECRET=super_secret_jwt_key_a_2026
+  GMAIL_USER=truongbmt4@gmail.com
+  GMAIL_APP_PASSWORD=ewivyksqtuvangom
+  CLIENT_ORIGIN=https://<domain_vercel_web_a>
+  ```
+* **Networking**: Port `4001` $\rightarrow$ Generate Domain (ví dụ: `https://dasso-server-a-production.up.railway.app`).
+
+#### 3. Backend App B `server-b/` (Service: `DaSSO-Server-B`)
+* **Branch**: `deploy`
+* **Root Directory**: `/server-b`
+* **Variables**:
+  ```env
+  PORT=4002
+  SUPABASE_DATABASE_URL=postgresql://postgres.<REF>:<PASS>@<HOST>:5432/postgres
+  DB_SCHEMA=server_b
+  JWT_SECRET=super_secret_jwt_key_b_2026
+  GMAIL_USER=truongbmt4@gmail.com
+  GMAIL_APP_PASSWORD=ewivyksqtuvangom
+  CLIENT_ORIGIN=https://<domain_vercel_web_b>
+  ```
+* **Networking**: Port `4002` $\rightarrow$ Generate Domain (ví dụ: `https://dasso-server-b-production.up.railway.app`).
 
 ---
 
@@ -111,7 +142,7 @@ Hệ thống sử dụng cơ chế Multi-Pipeline trên nhánh **`deploy`** vớ
 ## 🎯 Cơ Chế Lọc Đường Dẫn Multi-Pipeline
 
 * Sửa file trong `web-a/**` và/hoặc `web-b/**` $\rightarrow$ Chạy workflow `deploy-web.yml`, **chỉ deploy app có thay đổi** lên Vercel (chạy tay `workflow_dispatch` thì deploy cả 2).
-* Sửa file trong `server/**` $\rightarrow$ Chỉ chạy workflow `deploy-server.yml` (Railway).
+* Sửa file trong `server/**`, `server-a/**` và/hoặc `server-b/**` $\rightarrow$ Chạy workflow `deploy-server.yml`, **chỉ deploy server có thay đổi** lên Railway (chạy tay `workflow_dispatch` thì deploy cả 3).
 * Sửa file trong `keycloak/**` $\rightarrow$ Chỉ chạy workflow `deploy-keycloak.yml` (Railway).
 
 ---
