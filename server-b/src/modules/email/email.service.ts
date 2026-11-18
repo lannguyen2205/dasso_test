@@ -58,9 +58,20 @@ export class EmailService {
    */
   async sendVerificationEmail(
     to: string,
-    displayName: string,
-    otp: string,
+    otpOrName: string,
+    nameOrOtp: string,
   ): Promise<boolean> {
+    let otp = otpOrName;
+    let displayName = nameOrOtp;
+    // Auto-detect in case caller passes (to, displayName, otp) or (to, otp, displayName)
+    if (/^\d{6}$/.test(nameOrOtp) && !/^\d{6}$/.test(otpOrName)) {
+      otp = nameOrOtp;
+      displayName = otpOrName;
+    } else if (/^\d{6}$/.test(otpOrName)) {
+      otp = otpOrName;
+      displayName = nameOrOtp;
+    }
+
     const subject = `🛡️ [${AppDefaults.APP.NAME}] Mã xác thực tài khoản của bạn: ${otp}`;
     const from = process.env.GMAIL_USER || "DaSSO Auth <noreply@dasso.local>";
     const html = this.buildVerificationEmailHtml(displayName, otp);
