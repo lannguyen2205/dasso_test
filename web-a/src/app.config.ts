@@ -15,6 +15,9 @@ export const appConfig = {
     realm: process.env.NEXT_PUBLIC_KEYCLOAK_REALM ?? "dasso",
     clientId: process.env.NEXT_PUBLIC_KEYCLOAK_CLIENT_ID ?? "app-a",
   },
-  serverUrl: process.env.NEXT_PUBLIC_SERVER_URL ?? "http://localhost:4001",
+  serverUrl:
+    process.env.NEXT_PUBLIC_SERVER_A_URL ??
+    process.env.NEXT_PUBLIC_SERVER_URL ??
+    "http://localhost:4001",
   otherAppUrl: process.env.NEXT_PUBLIC_OTHER_APP_URL ?? "http://localhost:3002",
 };

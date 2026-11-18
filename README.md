@@ -113,7 +113,8 @@ Mỗi app là **một Vercel project riêng**. Làm 2 lần theo bảng sau:
    * **Root Directory**: Bấm **Edit** $\rightarrow$ Chọn thư mục theo bảng trên $\rightarrow$ Bấm *Continue*.
    * **Environment Variables**:
      * `NEXT_PUBLIC_KEYCLOAK_URL` = `https://<domain_keycloak_o_buoc_2>`
-     * `NEXT_PUBLIC_SERVER_URL` = `https://<domain_server_o_buoc_3>`
+     * `NEXT_PUBLIC_SERVER_A_URL` (cho Web A) hoặc `NEXT_PUBLIC_SERVER_B_URL` (cho Web B) = domain Server A / Server B trên Railway (ví dụ: `https://servera-production.up.railway.app`)
+     * *(Hoặc fallback)* `NEXT_PUBLIC_SERVER_URL` = domain server tương ứng
      * `NEXT_PUBLIC_OTHER_APP_URL` = theo bảng trên (domain của app còn lại)
      * *(Tuỳ chọn)* `NEXT_PUBLIC_KEYCLOAK_REALM` (mặc định `dasso`), `NEXT_PUBLIC_KEYCLOAK_CLIENT_ID` (mặc định `app-a` / `app-b`)
 5. Bấm nút **Deploy**.
