@@ -1,0 +1,59 @@
+{
+  "realm": "dasso",
+  "enabled": true,
+  "displayName": "DaSSO",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "clients": [
+    {
+      "clientId": "app-a",
+      "name": "App A",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "rootUrl": "http://localhost:3001",
+      "baseUrl": "/",
+      "redirectUris": ["http://localhost:3001/*"],
+      "webOrigins": ["+"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      }
+    },
+    {
+      "clientId": "app-b",
+      "name": "App B",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "rootUrl": "http://localhost:3002",
+      "baseUrl": "/",
+      "redirectUris": ["http://localhost:3002/*"],
+      "webOrigins": ["+"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "testuser",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "User",
+      "email": "testuser@example.com",
+      "credentials": [{ "type": "password", "value": "Test@123", "temporary": false }]
+    }
+  ]
+}
