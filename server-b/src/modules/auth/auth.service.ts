@@ -21,6 +21,7 @@ import { ResponseCodes } from "../../common/constants/response-codes";
 import { EmailService } from "../email/email.service";
 import { User } from "../users/entities/user.entity";
 import { EmailOtp } from "./entities/email-otp.entity";
+import * as bcrypt from "bcryptjs";
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -45,11 +46,12 @@ export class AuthService implements OnModuleInit {
         where: { email: defaultEmail },
       });
       if (!existing) {
+        const defaultPasswordHash = await bcrypt.hash("Test@123", 10);
         const testUser = this.userRepository.create({
           email: defaultEmail,
           username: "testuser",
           displayName: "Test User",
-          passwordHash: "Test@123",
+          passwordHash: defaultPasswordHash,
           avatarUrl: AppDefaults.AVATAR.getAvatarUrl("testuser"),
           isEmailVerified: true,
           emailVerifiedAt: new Date(),
@@ -98,6 +100,7 @@ export class AuthService implements OnModuleInit {
     }
 
     const displayName = dto.displayName?.trim() || username;
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
 
     let user = existing;
     if (!user) {
@@ -105,7 +108,7 @@ export class AuthService implements OnModuleInit {
         email: cleanEmail,
         username,
         displayName,
-        passwordHash: dto.password,
+        passwordHash: hashedPassword,
         avatarUrl: AppDefaults.AVATAR.getAvatarUrl(username),
         isEmailVerified: false,
         emailVerifiedAt: null,
@@ -113,7 +116,7 @@ export class AuthService implements OnModuleInit {
       });
       await this.userRepository.save(user);
     } else {
-      user.passwordHash = dto.password;
+      user.passwordHash = hashedPassword;
       user.displayName = displayName;
       await this.userRepository.save(user);
     }
@@ -250,7 +253,18 @@ export class AuthService implements OnModuleInit {
       where: [{ email: identifier }, { username: identifier }],
     });
 
-    if (!user || user.passwordHash !== dto.password) {
+    if (!user) {
+      throw new UnauthorizedException({
+        code: ResponseCodes.INVALID_CREDENTIALS,
+        message: "Invalid email or password",
+      });
+    }
+
+    const isPasswordValid = user.passwordHash.startsWith("$2")
+      ? await bcrypt.compare(dto.password, user.passwordHash)
+      : user.passwordHash === dto.password;
+
+    if (!isPasswordValid) {
       throw new UnauthorizedException({
         code: ResponseCodes.INVALID_CREDENTIALS,
         message: "Invalid email or password",
