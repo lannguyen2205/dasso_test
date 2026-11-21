@@ -331,21 +331,62 @@ export class AuthService implements OnModuleInit {
   }
 
   /**
-   * Get user profile by ID
+   * Get user profile by ID or JWT payload
    */
-  async getProfile(userId: string) {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-    });
+  async getProfile(userParam: any) {
+    const rawId =
+      typeof userParam === "string"
+        ? userParam
+        : userParam?.id || userParam?.sub;
+    const userEmail =
+      typeof userParam === "object" ? userParam?.email : undefined;
 
-    if (!user) {
-      throw new NotFoundException({
-        code: ResponseCodes.USER_NOT_FOUND,
-        message: "User profile not found",
+    // UUID v4 format regex to avoid PostgreSQL syntax error on non-UUID strings
+    const isUuid =
+      typeof rawId === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        rawId,
+      );
+
+    let user = null;
+    if (isUuid) {
+      user = await this.userRepository.findOne({
+        where: { id: rawId },
       });
     }
 
-    return this.sanitizeUser(user);
+    if (!user && userEmail) {
+      user = await this.userRepository.findOne({
+        where: { email: userEmail.toLowerCase().trim() },
+      });
+    }
+
+    if (user) {
+      return this.sanitizeUser(user);
+    }
+
+    // If user is authenticated via Keycloak SSO token but not recorded in local DB:
+    if (typeof userParam === "object" && userParam !== null) {
+      return {
+        id: userParam.id || userParam.sub || "sso-user",
+        email: userParam.email || "",
+        username: userParam.username || userParam.sub || "",
+        displayName:
+          userParam.displayName ||
+          userParam.name ||
+          userParam.email ||
+          "DaSSO User",
+        roles: userParam.roles || [],
+        isEmailVerified: true,
+        source: "keycloak_sso",
+        avatarUrl: userParam.avatarUrl || null,
+      };
+    }
+
+    throw new NotFoundException({
+      code: ResponseCodes.USER_NOT_FOUND,
+      message: "User profile not found",
+    });
   }
 
   /**

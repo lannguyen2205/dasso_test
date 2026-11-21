@@ -59,6 +59,9 @@ export default function AuthPanel() {
   const [testMeOutput, setTestMeOutput] = useState<string | null>(null);
   const [testMeLoading, setTestMeLoading] = useState(false);
 
+  // Mock SSO Integration Message
+  const [mockSsoMessage, setMockSsoMessage] = useState<string | null>(null);
+
   // Initialize Keycloak SSO on mount
   useEffect(() => {
     let isMounted = true;
@@ -437,8 +440,27 @@ export default function AuthPanel() {
           )}
         </div>
 
+        {/* Nút Tích hợp đăng nhập Keycloak SSO (Nút Mock hiển thị UI) */}
+        <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
+          <button
+            type="button"
+            onClick={() => {
+              setMockSsoMessage("✓ Yêu cầu tích hợp Keycloak SSO đã được kích hoạt (Mock Demo)");
+            }}
+            className="w-full flex items-center justify-center gap-2 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-4 py-3 text-xs font-semibold text-indigo-600 hover:bg-indigo-500/20 dark:border-indigo-400/30 dark:bg-indigo-400/10 dark:text-indigo-300 dark:hover:bg-indigo-400/20 transition-all"
+          >
+            <span className="text-base">🔑</span>
+            <span>Tích hợp đăng nhập Keycloak SSO</span>
+          </button>
+          {mockSsoMessage && (
+            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-2 text-center text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+              {mockSsoMessage}
+            </div>
+          )}
+        </div>
+
         {/* Action Buttons */}
-        <div className="flex gap-3 pt-2">
+        <div className="flex gap-3 pt-1">
           <a
             href={appConfig.otherAppUrl}
             target="_blank"

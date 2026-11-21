@@ -59,6 +59,9 @@ export default function AuthPanel() {
   const [testMeOutput, setTestMeOutput] = useState<string | null>(null);
   const [testMeLoading, setTestMeLoading] = useState(false);
 
+  // Mock SSO Integration Message
+  const [mockSsoMessage, setMockSsoMessage] = useState<string | null>(null);
+
   // Initialize Keycloak SSO on mount
   useEffect(() => {
     let isMounted = true;
@@ -437,8 +440,27 @@ export default function AuthPanel() {
           )}
         </div>
 
+        {/* Nút Tích hợp đăng nhập Keycloak SSO (Nút Mock hiển thị UI) */}
+        <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
+          <button
+            type="button"
+            onClick={() => {
+              setMockSsoMessage("✓ Yêu cầu tích hợp Keycloak SSO đã được kích hoạt (Mock Demo)");
+            }}
+            className="w-full flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs font-semibold text-emerald-600 hover:bg-emerald-500/20 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-300 dark:hover:bg-emerald-400/20 transition-all"
+          >
+            <span className="text-base">🔑</span>
+            <span>Tích hợp đăng nhập Keycloak SSO</span>
+          </button>
+          {mockSsoMessage && (
+            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-2 text-center text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+              {mockSsoMessage}
+            </div>
+          )}
+        </div>
+
         {/* Action Buttons */}
-        <div className="flex gap-3 pt-2">
+        <div className="flex gap-3 pt-1">
           <a
             href={appConfig.otherAppUrl}
             target="_blank"
@@ -498,11 +520,10 @@ export default function AuthPanel() {
 
           {verifyMessage && (
             <div
-              className={`rounded-lg p-3 text-xs ${
-                verifyMessage.type === "success"
-                  ? "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300"
-                  : "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300"
-              }`}
+              className={`rounded-lg p-3 text-xs ${verifyMessage.type === "success"
+                ? "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300"
+                : "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300"
+                }`}
             >
               {verifyMessage.text}
             </div>
@@ -562,11 +583,10 @@ export default function AuthPanel() {
                 setTab("login");
                 setLoginError(null);
               }}
-              className={`pb-3 px-4 text-sm font-medium border-b-2 transition-colors ${
-                tab === "login"
-                  ? `${appConfig.accent.border} ${appConfig.accent.text}`
-                  : "border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400"
-              }`}
+              className={`pb-3 px-4 text-sm font-medium border-b-2 transition-colors ${tab === "login"
+                ? `${appConfig.accent.border} ${appConfig.accent.text}`
+                : "border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400"
+                }`}
             >
               Đăng nhập
             </button>
@@ -576,11 +596,10 @@ export default function AuthPanel() {
                 setTab("register");
                 setRegError(null);
               }}
-              className={`pb-3 px-4 text-sm font-medium border-b-2 transition-colors ${
-                tab === "register"
-                  ? `${appConfig.accent.border} ${appConfig.accent.text}`
-                  : "border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400"
-              }`}
+              className={`pb-3 px-4 text-sm font-medium border-b-2 transition-colors ${tab === "register"
+                ? `${appConfig.accent.border} ${appConfig.accent.text}`
+                : "border-transparent text-zinc-500 hover:text-zinc-700 dark:text-zinc-400"
+                }`}
             >
               Đăng ký Email (OTP)
             </button>
