@@ -20,6 +20,8 @@ export const AppDefaults = {
     URL: "http://localhost:8080",
     REALM: "dasso",
     CLIENT_ID: "app-b",
+    ADMIN_CLIENT_ID: "dasso-admin-api",
+    SET_PASSWORD_LINK_LIFESPAN_SECONDS: 43200, // 12 hours
   },
   AVATAR: {
     DEFAULT_AVATAR_URL: "https://api.dicebear.com/7.x/bottts/png?seed=dasso-b",

@@ -156,6 +156,33 @@ export class AuthController {
     };
   }
 
+  @Post("keycloak-account")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Create a Keycloak user from the current account's email (or reuse the existing one) and email a set-password link",
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      "Keycloak user ready; see data.created / data.passwordEmailSent / data.passwordEmailError",
+  })
+  @ApiResponse({ status: 503, description: "Keycloak unreachable or misconfigured" })
+  async createKeycloakAccount(@Req() req: Request) {
+    const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+    const data = await this.authService.createKeycloakAccount(token);
+    return {
+      _code: data.isLinkedSSO
+        ? ResponseCodes.KEYCLOAK_ALREADY_LINKED
+        : data.created
+          ? ResponseCodes.KEYCLOAK_USER_CREATED
+          : ResponseCodes.KEYCLOAK_PASSWORD_EMAIL_SENT,
+      data,
+    };
+  }
+
   @Get("me")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

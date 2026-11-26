@@ -21,6 +21,7 @@ import { ResponseCodes } from "../../common/constants/response-codes";
 import { EmailService } from "../email/email.service";
 import { User } from "../users/entities/user.entity";
 import { EmailOtp } from "./entities/email-otp.entity";
+import { KeycloakAdminService } from "../keycloak/keycloak-admin.service";
 import * as bcrypt from "bcryptjs";
 
 @Injectable()
@@ -34,6 +35,7 @@ export class AuthService implements OnModuleInit {
     private readonly otpRepository: Repository<EmailOtp>,
     private readonly emailService: EmailService,
     private readonly jwtService: JwtService,
+    private readonly keycloakAdmin: KeycloakAdminService,
   ) {}
 
   /**
@@ -280,6 +282,7 @@ export class AuthService implements OnModuleInit {
     }
 
     const tokens = await this.generateTokens(user);
+    await this.refreshSsoLink(user);
 
     return {
       message: "Login successful",
@@ -362,6 +365,7 @@ export class AuthService implements OnModuleInit {
     }
 
     if (user) {
+      await this.refreshSsoLink(user);
       return this.sanitizeUser(user);
     }
 
@@ -387,6 +391,127 @@ export class AuthService implements OnModuleInit {
       code: ResponseCodes.USER_NOT_FOUND,
       message: "User profile not found",
     });
+  }
+
+  /**
+   * Create a Keycloak user for the currently logged-in local account.
+   * The bearer token's signature is verified here (the shared JwtStrategy only
+   * decodes it), and the email is taken from the database, never from the client.
+   */
+  async createKeycloakAccount(accessToken: string) {
+    let payload: { sub?: string };
+    try {
+      payload = this.jwtService.verify(accessToken, {
+        secret: process.env.JWT_SECRET || "default_jwt_secret_dasso",
+      });
+    } catch {
+      throw new UnauthorizedException({
+        code: ResponseCodes.INVALID_TOKEN,
+        message: "Access token is invalid or was not issued by this server",
+      });
+    }
+
+    const user = payload.sub
+      ? await this.userRepository.findOne({ where: { id: payload.sub } })
+      : null;
+    if (!user) {
+      throw new NotFoundException({
+        code: ResponseCodes.USER_NOT_FOUND,
+        message: "User not found",
+      });
+    }
+    if (!user.isEmailVerified) {
+      throw new UnauthorizedException({
+        code: ResponseCodes.EMAIL_NOT_VERIFIED,
+        message: "Email must be verified before creating a Keycloak account",
+      });
+    }
+
+    // Create the Keycloak user; if it already exists, reuse it so the
+    // set-password email can be (re)sent.
+    let keycloakUserId: string | null;
+    let created = true;
+    try {
+      ({ id: keycloakUserId } = await this.keycloakAdmin.createUser({
+        email: user.email,
+        emailVerified: user.isEmailVerified,
+        firstName: user.displayName || undefined,
+      }));
+      this.logger.log(`🔑 Keycloak user created for ${user.email} (id: ${keycloakUserId})`);
+    } catch (err) {
+      if (!(err instanceof ConflictException)) throw err;
+      created = false;
+      keycloakUserId = await this.keycloakAdmin.findUserIdByEmail(user.email);
+    }
+
+    if (!keycloakUserId) {
+      throw new NotFoundException({
+        code: ResponseCodes.USER_NOT_FOUND,
+        message: "Keycloak user could not be resolved",
+      });
+    }
+
+    if (user.keycloakUserId !== keycloakUserId) {
+      user.keycloakUserId = keycloakUserId;
+      await this.userRepository.save(user);
+    }
+
+    // Password already set on Keycloak (e.g. link done in another tab): mark linked, no email.
+    if (await this.refreshSsoLink(user)) {
+      return {
+        keycloakUserId,
+        email: user.email,
+        created,
+        isLinkedSSO: true,
+        passwordEmailSent: false,
+        passwordEmailError: null,
+      };
+    }
+
+    // The user was created without a password: email them a set-password link.
+    // A failed email must not hide the fact that the user now exists.
+    let passwordEmailSent = false;
+    let passwordEmailError: string | null = null;
+    try {
+      await this.keycloakAdmin.sendSetPasswordEmail(keycloakUserId, {
+        clientId: AppDefaults.KEYCLOAK.CLIENT_ID,
+        redirectUri: `${process.env.CLIENT_ORIGIN || AppDefaults.APP.DEFAULT_CLIENT_ORIGIN}/`,
+        lifespanSeconds: AppDefaults.KEYCLOAK.SET_PASSWORD_LINK_LIFESPAN_SECONDS,
+      });
+      passwordEmailSent = true;
+      this.logger.log(`📧 Keycloak set-password email sent to ${user.email}`);
+    } catch (err) {
+      passwordEmailError = (err as Error).message;
+    }
+
+    return {
+      keycloakUserId,
+      email: user.email,
+      created,
+      isLinkedSSO: false,
+      passwordEmailSent,
+      passwordEmailError,
+    };
+  }
+
+  /**
+   * Sets isLinkedSSO once the linked Keycloak user has a password.
+   * Keycloak does not notify us when the set-password link is completed,
+   * so this is checked lazily (login, /me, link button). Never throws:
+   * a Keycloak outage must not break local login. Returns the flag.
+   */
+  private async refreshSsoLink(user: User): Promise<boolean> {
+    if (user.isLinkedSSO || !user.keycloakUserId) return user.isLinkedSSO;
+    try {
+      if (await this.keycloakAdmin.hasPassword(user.keycloakUserId)) {
+        user.isLinkedSSO = true;
+        await this.userRepository.save(user);
+        this.logger.log(`🔗 ${user.email} is now linked to Keycloak SSO`);
+      }
+    } catch (err) {
+      this.logger.warn(`Could not check Keycloak link for ${user.email}: ${(err as Error).message}`);
+    }
+    return user.isLinkedSSO;
   }
 
   /**

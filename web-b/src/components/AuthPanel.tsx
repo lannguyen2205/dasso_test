@@ -11,6 +11,7 @@ interface ServerUser {
   displayName?: string;
   username?: string;
   isEmailVerified: boolean;
+  isLinkedSSO?: boolean;
   roles?: string[];
 }
 
@@ -61,6 +62,10 @@ export default function AuthPanel() {
 
   // Mock SSO Integration Message
   const [mockSsoMessage, setMockSsoMessage] = useState<string | null>(null);
+
+  // Create Keycloak user from current server account
+  const [kcCreateLoading, setKcCreateLoading] = useState(false);
+  const [kcCreateMessage, setKcCreateMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Initialize Keycloak SSO on mount
   useEffect(() => {
@@ -259,6 +264,41 @@ export default function AuthPanel() {
     }
   }
 
+  // 5b. Tạo user Keycloak từ email đang đăng nhập (server dùng Keycloak Admin API)
+  async function handleCreateKeycloakUser() {
+    if (!serverToken) return;
+    setKcCreateLoading(true);
+    setKcCreateMessage(null);
+
+    try {
+      const res = await fetch(`${appConfig.serverUrl}/api/v1/auth/keycloak-account`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${serverToken}` },
+      });
+      const body = await res.json();
+      if (!res.ok || !body.success) {
+        throw new Error(body.error?.message || "Không tạo được user trên Keycloak");
+      }
+      const { email, created, isLinkedSSO, passwordEmailSent, passwordEmailError } = body.data;
+      if (isLinkedSSO) {
+        // Password already set on Keycloak -> hide the link button
+        setServerUser((u) => (u ? { ...u, isLinkedSSO: true } : u));
+        return;
+      }
+      const prefix = created ? `Đã tạo user Keycloak cho ${email}` : `User Keycloak ${email} đã tồn tại`;
+      setKcCreateMessage(
+        passwordEmailSent
+          ? { type: "success", text: `✓ ${prefix}. Đã gửi mail đặt mật khẩu, vui lòng kiểm tra hộp thư.` }
+          : { type: "error", text: `${prefix}, nhưng chưa gửi được mail đặt mật khẩu: ${passwordEmailError}` },
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Lỗi kết nối Backend Server";
+      setKcCreateMessage({ type: "error", text: msg });
+    } finally {
+      setKcCreateLoading(false);
+    }
+  }
+
   // 6. Đăng xuất Server Riêng
   async function handleServerLogout() {
     if (serverToken) {
@@ -331,25 +371,6 @@ export default function AuthPanel() {
             <span className="text-zinc-500">Realm:</span>
             <span className="text-zinc-800 dark:text-zinc-200">{appConfig.keycloak.realm}</span>
           </div>
-        </div>
-
-        {/* Nút Tích hợp đăng nhập Keycloak SSO (Nút Mock hiển thị UI) */}
-        <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
-          <button
-            type="button"
-            onClick={() => {
-              setMockSsoMessage("✓ Yêu cầu tích hợp Keycloak SSO đã được kích hoạt (Mock Demo)");
-            }}
-            className="w-full flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs font-semibold text-emerald-600 hover:bg-emerald-500/20 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-300 dark:hover:bg-emerald-400/20 transition-all"
-          >
-            <span className="text-base">🔑</span>
-            <span>Tích hợp đăng nhập Keycloak SSO</span>
-          </button>
-          {mockSsoMessage && (
-            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-2 text-center text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-              {mockSsoMessage}
-            </div>
-          )}
         </div>
 
         <div className="flex gap-3">
@@ -459,24 +480,37 @@ export default function AuthPanel() {
           )}
         </div>
 
-        {/* Nút Tích hợp đăng nhập Keycloak SSO (Nút Mock hiển thị UI) */}
-        <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
-          <button
-            type="button"
-            onClick={() => {
-              setMockSsoMessage("✓ Yêu cầu tích hợp Keycloak SSO đã được kích hoạt (Mock Demo)");
-            }}
-            className="w-full flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs font-semibold text-emerald-600 hover:bg-emerald-500/20 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-300 dark:hover:bg-emerald-400/20 transition-all"
-          >
-            <span className="text-base">🔑</span>
-            <span>Tích hợp đăng nhập Keycloak SSO</span>
-          </button>
-          {mockSsoMessage && (
-            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-2 text-center text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-              {mockSsoMessage}
-            </div>
-          )}
-        </div>
+        {/* Tạo user Keycloak từ email đang đăng nhập (ẩn khi đã liên kết SSO) */}
+        {serverUser.isLinkedSSO ? (
+          <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <p className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-2 text-center text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              ✓ Tài khoản đã liên kết Keycloak SSO
+            </p>
+          </div>
+        ) : (
+          <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 space-y-2">
+            <button
+              type="button"
+              onClick={handleCreateKeycloakUser}
+              disabled={kcCreateLoading || !serverToken}
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs font-semibold text-emerald-600 hover:bg-emerald-500/20 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-300 dark:hover:bg-emerald-400/20 transition-all disabled:opacity-50"
+            >
+              <span className="text-base">🔑</span>
+              <span>{kcCreateLoading ? "Đang tạo user Keycloak…" : "Tích hợp đăng nhập Keycloak SSO"}</span>
+            </button>
+            {kcCreateMessage && (
+              <div
+                className={`rounded-lg border p-2 text-center text-xs font-medium ${
+                  kcCreateMessage.type === "success"
+                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                    : "bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400"
+                }`}
+              >
+                {kcCreateMessage.text}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex gap-3 pt-1">
