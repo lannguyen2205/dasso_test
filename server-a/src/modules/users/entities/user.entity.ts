@@ -32,6 +32,14 @@ export class User {
   @Column({ type: "timestamp", nullable: true })
   emailVerifiedAt: Date | null;
 
+  // Keycloak user created from this account (POST /api/v1/auth/keycloak-account)
+  @Column({ type: "varchar", nullable: true })
+  keycloakUserId: string | null;
+
+  // true once the Keycloak user exists AND has set a password via the email link
+  @Column({ default: false })
+  isLinkedSSO: boolean;
+
   @Column("simple-array", { default: "user" })
   roles: string[];
 

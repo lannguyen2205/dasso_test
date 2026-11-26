@@ -39,6 +39,14 @@ export const ResponseCodes = {
   USERS_FETCHED: "users_fetched",
   USER_CREATED: "user_created",
   USER_DELETED: "user_deleted",
+
+  // Keycloak Admin Integration
+  KEYCLOAK_USER_CREATED: "keycloak_user_created",
+  KEYCLOAK_USER_ALREADY_EXISTS: "keycloak_user_already_exists",
+  KEYCLOAK_UNAVAILABLE: "keycloak_unavailable",
+  KEYCLOAK_PASSWORD_EMAIL_SENT: "keycloak_password_email_sent",
+  KEYCLOAK_ALREADY_LINKED: "keycloak_already_linked",
+  KEYCLOAK_EMAIL_FAILED: "keycloak_email_failed",
 } as const;
 
 export type ResponseCode = (typeof ResponseCodes)[keyof typeof ResponseCodes];

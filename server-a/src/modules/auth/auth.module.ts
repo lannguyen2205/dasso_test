@@ -10,6 +10,7 @@ import { RolesGuard } from "./guards/roles.guard";
 import { EmailModule } from "../email/email.module";
 import { User } from "../users/entities/user.entity";
 import { EmailOtp } from "./entities/email-otp.entity";
+import { KeycloakAdminService } from "../keycloak/keycloak-admin.service";
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { EmailOtp } from "./entities/email-otp.entity";
     EmailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard, KeycloakAdminService],
   exports: [AuthService, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}
